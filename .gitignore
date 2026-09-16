@@ -1,0 +1,3 @@
+packaging/build/
+*.deb
+*.log

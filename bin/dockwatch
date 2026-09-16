@@ -1,0 +1,356 @@
+#!/bin/bash
+
+# ============================================
+# DockWatch
+# Docker Server Monitoring CLI
+# Made by Awnish
+# ============================================
+
+VERSION="1.0.0"
+
+
+# --------------------------------------------
+# Colors
+# --------------------------------------------
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+
+# --------------------------------------------
+# Banner
+# --------------------------------------------
+
+show_banner() {
+    echo ""
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                 DockWatch                    ║"
+    echo "║        Docker Server Monitoring CLI          ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo ""
+    echo "Welcome to DockWatch!"
+    echo "Made by Awnish"
+    echo ""
+    echo "DockWatch helps you monitor your Docker server,"
+    echo "containers, CPU, RAM, disk and Docker resources."
+    echo ""
+}
+
+
+# --------------------------------------------
+# Check Docker
+# --------------------------------------------
+
+check_docker() {
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}Error:${NC} Docker is not installed."
+        echo ""
+        echo "Please install Docker first."
+        exit 1
+    fi
+
+    if ! systemctl is-active --quiet docker; then
+        echo -e "${RED}Error:${NC} Docker Engine is not running."
+        echo ""
+        echo "Try:"
+        echo "  sudo systemctl start docker"
+        exit 1
+    fi
+}
+
+
+# --------------------------------------------
+# Docker Summary
+# --------------------------------------------
+
+show_summary() {
+
+    DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null)
+    TOTAL_CONTAINERS=$(docker info --format '{{.Containers}}' 2>/dev/null)
+    RUNNING_CONTAINERS=$(docker info --format '{{.ContainersRunning}}' 2>/dev/null)
+    STOPPED_CONTAINERS=$(docker info --format '{{.ContainersStopped}}' 2>/dev/null)
+    TOTAL_IMAGES=$(docker info --format '{{.Images}}' 2>/dev/null)
+
+    echo "Docker Engine : ${GREEN}RUNNING${NC}"
+    echo "Docker Version: $DOCKER_VERSION"
+
+    echo ""
+    echo "================================"
+    echo "       Container Summary"
+    echo "================================"
+
+    echo "Total Containers   : $TOTAL_CONTAINERS"
+    echo "Running Containers : $RUNNING_CONTAINERS"
+    echo "Stopped Containers : $STOPPED_CONTAINERS"
+    echo "Total Images       : $TOTAL_IMAGES"
+}
+
+
+# --------------------------------------------
+# Container List
+# --------------------------------------------
+
+show_containers() {
+
+    echo ""
+    echo "================================"
+    echo "       Docker Containers"
+    echo "================================"
+    echo ""
+
+    docker ps -a \
+        --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+    echo ""
+}
+
+
+# --------------------------------------------
+# Container Statistics
+# --------------------------------------------
+
+show_stats() {
+
+    echo ""
+    echo "================================"
+    echo "       Container Statistics"
+    echo "================================"
+    echo ""
+
+    RUNNING=$(docker info --format '{{.ContainersRunning}}' 2>/dev/null)
+
+    if [ "$RUNNING" -eq 0 ]; then
+        echo "No running containers."
+        echo ""
+        return
+    fi
+
+    printf "%-14s %-22s %-10s %-28s %-10s\n" \
+        "CONTAINER ID" "NAME" "CPU %" "MEMORY" "MEM %"
+
+    docker stats --no-stream \
+        --format "{{.ID}}\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}" |
+    while IFS=$'\t' read -r ID NAME CPU MEMORY MEM_PERCENT
+    do
+        printf "%-14s %-22s %-10s %-28s %-10s\n" \
+            "$ID" "$NAME" "$CPU" "$MEMORY" "$MEM_PERCENT"
+    done
+
+    echo ""
+}
+
+
+# --------------------------------------------
+# Docker Disk Usage
+# --------------------------------------------
+
+show_disk() {
+
+    echo ""
+    echo "================================"
+    echo "       Docker Disk Usage"
+    echo "================================"
+    echo ""
+
+    docker system df
+
+    echo ""
+}
+
+
+# --------------------------------------------
+# Docker Information
+# --------------------------------------------
+
+show_info() {
+
+    echo ""
+    echo "================================"
+    echo "       Docker Information"
+    echo "================================"
+    echo ""
+
+    docker info --format \
+        "Docker Version : {{.ServerVersion}}
+CPUs           : {{.NCPU}}
+Memory         : {{.MemTotal}}
+Containers     : {{.Containers}}
+Running        : {{.ContainersRunning}}
+Stopped        : {{.ContainersStopped}}
+Images         : {{.Images}}
+Storage Driver : {{.Driver}}
+Cgroup Driver  : {{.CgroupDriver}}
+Cgroup Version : {{.CgroupVersion}}"
+
+    echo ""
+}
+
+
+# --------------------------------------------
+# System Resources
+# --------------------------------------------
+
+show_system() {
+
+    echo ""
+    echo "================================"
+    echo "       System Resources"
+    echo "================================"
+    echo ""
+
+    # CPU
+    CPU_USAGE=$(top -bn1 | awk '/Cpu\(s\)/ {
+        printf "%.1f", 100 - $8
+    }')
+
+    # Memory
+    MEM_TOTAL=$(free -m | awk '/Mem:/ {print $2}')
+    MEM_USED=$(free -m | awk '/Mem:/ {print $3}')
+    MEM_AVAILABLE=$(free -m | awk '/Mem:/ {print $7}')
+
+    if [ "$MEM_TOTAL" -gt 0 ]; then
+        MEM_PERCENT=$(awk \
+            "BEGIN {printf \"%.1f\", ($MEM_USED/$MEM_TOTAL)*100}")
+    else
+        MEM_PERCENT="0.0"
+    fi
+
+    # Disk
+    DISK_INFO=$(df -h / | awk 'NR==2 {
+        print $3, $2, $5
+    }')
+
+    DISK_USED=$(echo "$DISK_INFO" | awk '{print $1}')
+    DISK_TOTAL=$(echo "$DISK_INFO" | awk '{print $2}')
+    DISK_PERCENT=$(echo "$DISK_INFO" | awk '{print $3}')
+
+    echo "CPU Usage       : ${CPU_USAGE}%"
+    echo ""
+    echo "RAM Total       : ${MEM_TOTAL} MB"
+    echo "RAM Used        : ${MEM_USED} MB"
+    echo "RAM Available   : ${MEM_AVAILABLE} MB"
+    echo "RAM Usage       : ${MEM_PERCENT}%"
+    echo ""
+    echo "Disk Used       : ${DISK_USED}"
+    echo "Disk Total      : ${DISK_TOTAL}"
+    echo "Disk Usage      : ${DISK_PERCENT}"
+
+    echo ""
+}
+
+
+# --------------------------------------------
+# Full Dashboard
+# --------------------------------------------
+
+show_dashboard() {
+
+    show_banner
+
+    show_summary
+
+    show_system
+
+    show_containers
+
+    show_stats
+
+    show_disk
+}
+
+
+# --------------------------------------------
+# Help
+# --------------------------------------------
+
+show_help() {
+
+    echo ""
+    echo "DockWatch - Docker Server Monitoring CLI"
+    echo ""
+    echo "Usage:"
+    echo "  dockwatch              Show full dashboard"
+    echo "  dockwatch ps           Show all containers"
+    echo "  dockwatch stats        Show container CPU/RAM"
+    echo "  dockwatch disk         Show Docker disk usage"
+    echo "  dockwatch info         Show Docker information"
+    echo "  dockwatch system       Show server CPU/RAM/disk"
+    echo "  dockwatch version      Show DockWatch version"
+    echo "  dockwatch help         Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  dockwatch"
+    echo "  dockwatch ps"
+    echo "  dockwatch stats"
+    echo "  dockwatch disk"
+    echo "  dockwatch info"
+    echo "  dockwatch system"
+    echo ""
+}
+
+
+# --------------------------------------------
+# Version
+# --------------------------------------------
+
+show_version() {
+
+    echo "DockWatch version $VERSION"
+}
+
+
+# --------------------------------------------
+# Main
+# --------------------------------------------
+
+check_docker
+
+
+case "$1" in
+
+    "")
+        show_dashboard
+        ;;
+
+    ps)
+        show_containers
+        ;;
+
+    stats)
+        show_stats
+        ;;
+
+    disk)
+        show_disk
+        ;;
+
+    info)
+        show_info
+        ;;
+
+    system)
+        show_system
+        ;;
+
+    help|--help|-h)
+        show_help
+        ;;
+
+    version|--version|-v)
+        show_version
+        ;;
+
+    *)
+        echo ""
+        echo -e "${RED}Unknown command:${NC} $1"
+        echo ""
+        echo "Run 'dockwatch help' for available commands."
+        echo ""
+        exit 1
+        ;;
+
+esac
