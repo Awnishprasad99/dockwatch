@@ -1,0 +1,37 @@
+name: Build DockWatch DEB
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Prepare package
+        run: |
+          mkdir -p packaging/build/dockwatch_1.0.0/DEBIAN
+          mkdir -p packaging/build/dockwatch_1.0.0/usr/bin
+
+          cp bin/dockwatch \
+             packaging/build/dockwatch_1.0.0/usr/bin/dockwatch
+
+          chmod 755 \
+             packaging/build/dockwatch_1.0.0/usr/bin/dockwatch
+
+      - name: Build Debian package
+        run: |
+          dpkg-deb --build \
+            packaging/build/dockwatch_1.0.0
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockwatch-deb
+          path: packaging/build/*.deb
