@@ -6,7 +6,7 @@
 # Made by Awnish
 # ============================================
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 
 # --------------------------------------------
@@ -213,8 +213,7 @@ show_system() {
     MEM_AVAILABLE=$(free -m | awk '/Mem:/ {print $7}')
 
     if [ "$MEM_TOTAL" -gt 0 ]; then
-        MEM_PERCENT=$(awk \
-            "BEGIN {printf \"%.1f\", ($MEM_USED/$MEM_TOTAL)*100}")
+        MEM_PERCENT=$(awk "BEGIN {printf \"%.1f\", ($MEM_USED/$MEM_TOTAL)*100}")
     else
         MEM_PERCENT="0.0"
     fi
