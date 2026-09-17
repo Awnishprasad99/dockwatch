@@ -19,6 +19,16 @@ jobs:
           mkdir -p packaging/build/dockwatch_1.0.0/DEBIAN
           mkdir -p packaging/build/dockwatch_1.0.0/usr/bin
 
+          cat > packaging/build/dockwatch_1.0.0/DEBIAN/control << 'EOF'
+          Package: dockwatch
+          Version: 1.0.0
+          Section: admin
+          Priority: optional
+          Architecture: all
+          Maintainer: Awnish <82196621+Awnishprasad99@users.noreply.github.com>
+          Description: Docker Server Monitoring CLI for Linux
+          EOF
+
           cp bin/dockwatch \
              packaging/build/dockwatch_1.0.0/usr/bin/dockwatch
 
