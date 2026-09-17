@@ -6,6 +6,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,14 +19,15 @@ jobs:
 
       - name: Prepare package
         run: |
-          PACKAGE_ROOT="packaging/build/dockwatch_1.0.1"
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_ROOT="packaging/build/dockwatch_${VERSION}"
 
           mkdir -p "$PACKAGE_ROOT/DEBIAN"
           mkdir -p "$PACKAGE_ROOT/usr/bin"
 
-          cat > "$PACKAGE_ROOT/DEBIAN/control" <<'EOF'
+          cat > "$PACKAGE_ROOT/DEBIAN/control" <<EOF
           Package: dockwatch
-          Version: 1.0.1
+          Version: ${VERSION}
           Section: utils
           Priority: optional
           Architecture: all
@@ -39,19 +43,35 @@ jobs:
 
       - name: Build Debian package
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
           dpkg-deb --build \
-            packaging/build/dockwatch_1.0.1
+            "packaging/build/dockwatch_${VERSION}"
 
       - name: Check package
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
           dpkg-deb --info \
-            packaging/build/dockwatch_1.0.1.deb
+            "packaging/build/dockwatch_${VERSION}.deb"
 
           dpkg-deb --contents \
-            packaging/build/dockwatch_1.0.1.deb
+            "packaging/build/dockwatch_${VERSION}.deb"
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
           name: dockwatch-deb
           path: packaging/build/*.deb
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${GITHUB_REF_NAME}"
+
+          gh release create "$TAG" \
+            "packaging/build/dockwatch_${VERSION}.deb" \
+            --title "DockWatch ${VERSION}" \
+            --generate-notes
