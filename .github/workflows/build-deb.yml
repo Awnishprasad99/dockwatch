@@ -16,19 +16,39 @@ jobs:
 
       - name: Prepare package
         run: |
-          mkdir -p packaging/build/dockwatch_1.0.0/DEBIAN
-          mkdir -p packaging/build/dockwatch_1.0.0/usr/bin
+          PACKAGE_ROOT="packaging/build/dockwatch_1.0.0"
 
-          cp bin/dockwatch \
-             packaging/build/dockwatch_1.0.0/usr/bin/dockwatch
+          mkdir -p "$PACKAGE_ROOT/DEBIAN"
+          mkdir -p "$PACKAGE_ROOT/usr/bin"
 
-          chmod 755 \
-             packaging/build/dockwatch_1.0.0/usr/bin/dockwatch
+          cat > "$PACKAGE_ROOT/DEBIAN/control" <<'EOF'
+          Package: dockwatch
+          Version: 1.0.0
+          Section: utils
+          Priority: optional
+          Architecture: all
+          Maintainer: Awnish Prasad <awnishprasad99@users.noreply.github.com>
+          Description: DockWatch container monitoring utility
+           Monitors and manages Docker containers.
+          EOF
+
+          cp bin/dockwatch "$PACKAGE_ROOT/usr/bin/dockwatch"
+
+          chmod 755 "$PACKAGE_ROOT/usr/bin/dockwatch"
+          chmod 644 "$PACKAGE_ROOT/DEBIAN/control"
 
       - name: Build Debian package
         run: |
           dpkg-deb --build \
             packaging/build/dockwatch_1.0.0
+
+      - name: Check package
+        run: |
+          dpkg-deb --info \
+            packaging/build/dockwatch_1.0.0.deb
+
+          dpkg-deb --contents \
+            packaging/build/dockwatch_1.0.0.deb
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
